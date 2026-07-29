@@ -1,0 +1,37 @@
+# Render Blueprint — FBV Tender & Contract Management System (full-stack)
+# One Render Web Service runs everything: the Hono/tRPC API AND the built
+# React frontend (dist/) on the same port. The database is an external
+# MySQL-compatible instance (Render has no managed MySQL — use TiDB Cloud
+# Serverless or PlanetScale and paste its connection string as DATABASE_URL).
+
+services:
+  - type: web
+    name: fbv-tender-system
+    runtime: node
+    plan: starter
+    branch: master
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      # ── Secrets: Render prompts for these in the dashboard (sync: false) ──
+      - key: DATABASE_URL      # mysql://user:pass@host:4000/fbv?ssl={...}
+        sync: false
+      - key: APP_ID            # Kimi OAuth app id
+        sync: false
+      - key: APP_SECRET        # Kimi OAuth app secret (JWT signing)
+        sync: false
+      - key: KIMI_AUTH_URL     # Kimi OAuth server URL (backend)
+        sync: false
+      - key: KIMI_OPEN_URL     # Kimi Open Platform URL
+        sync: false
+      - key: VITE_KIMI_AUTH_URL  # same auth URL, baked into the frontend build
+        sync: false
+      - key: VITE_APP_ID         # same app id, baked into the frontend build
+        sync: false
+      - key: OWNER_UNION_ID      # optional: union id that becomes admin
+        sync: false
