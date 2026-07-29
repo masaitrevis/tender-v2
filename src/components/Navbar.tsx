@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, ChevronRight, Search, Settings, User, LogOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getNeedsAttention, useStore, type AttentionItem } from '@/lib/store';
+import CommandPalette from '@/components/intelligence/CommandPalette';
 import { Pill, type Tone } from '@/components/shared';
 
 const CRUMB_LABEL: Record<string, string> = {
@@ -68,8 +69,20 @@ export default function Navbar() {
   const state = useStore();
   const [bellOpen, setBellOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const bellRef = useClickOutside(() => setBellOpen(false));
   const userRef = useClickOutside(() => setUserOpen(false));
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const attention = useMemo(() => getNeedsAttention(state), [state]);
   const user = state.users[0];
@@ -98,7 +111,7 @@ export default function Navbar() {
       {/* Right cluster */}
       <div className="flex items-center gap-2">
         <button
-          onClick={() => navigate('/search')}
+          onClick={() => setPaletteOpen(true)}
           className="flex h-9 items-center gap-2 rounded-lg border border-app-border bg-app-bg px-3 text-[13px] text-app-muted transition hover:border-action hover:text-app-slate"
         >
           <Search size={15} />
@@ -205,6 +218,7 @@ export default function Navbar() {
           </AnimatePresence>
         </div>
       </div>
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </header>
   );
 }

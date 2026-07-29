@@ -2,7 +2,34 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import Dashboard from '@/pages/Dashboard';
 import Login from '@/pages/Login';
-import PageStub from '@/pages/PageStub';
+import Analytics from '@/pages/Analytics';
+import Clients from '@/pages/Clients';
+import Suppliers from '@/pages/Suppliers';
+import Products from '@/pages/Products';
+import Employees from '@/pages/Employees';
+import BulkUpload from '@/pages/BulkUpload';
+import Tenders from '@/pages/Tenders';
+import TenderDetail from '@/pages/TenderDetail';
+import Eligibility from '@/pages/Eligibility';
+import BidDecision from '@/pages/BidDecision';
+import Estimation from '@/pages/Estimation';
+import DocumentCenter from '@/pages/DocumentCenter';
+import DocumentEditor from '@/pages/DocumentEditor';
+import Dms from '@/pages/Dms';
+import DocTracker from '@/pages/DocTracker';
+import Payments from '@/pages/Payments';
+import Deadlines from '@/pages/Deadlines';
+import Bonds from '@/pages/Bonds';
+import Contracts from '@/pages/Contracts';
+import Risks from '@/pages/Risks';
+import Approvals from '@/pages/Approvals';
+import Crm from '@/pages/Crm';
+import Reports from '@/pages/Reports';
+import Search from '@/pages/Search';
+import Audit from '@/pages/Audit';
+import Profile from '@/pages/Profile';
+import Users from '@/pages/Users';
+import Settings from '@/pages/Settings';
 
 export default function App() {
   return (
@@ -10,34 +37,34 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<Layout />}>
         <Route index element={<Dashboard />} />
-        <Route path="analytics" element={<PageStub title="Analytics" />} />
-        <Route path="clients" element={<PageStub title="Clients" />} />
-        <Route path="suppliers" element={<PageStub title="Suppliers" />} />
-        <Route path="products" element={<PageStub title="Products" />} />
-        <Route path="employees" element={<PageStub title="Employees" />} />
-        <Route path="bulk-upload" element={<PageStub title="Bulk Upload Centre" />} />
-        <Route path="tenders" element={<PageStub title="Tender Register" />} />
-        <Route path="tenders/:id" element={<PageStub title="Tender Detail" />} />
-        <Route path="eligibility" element={<PageStub title="Eligibility Checker" />} />
-        <Route path="bid-decision" element={<PageStub title="Bid / No-Bid Decision" />} />
-        <Route path="estimation" element={<PageStub title="Cost Estimation & BOQ" />} />
-        <Route path="documents" element={<PageStub title="Document Center" />} />
-        <Route path="documents/new/:type" element={<PageStub title="New Document" />} />
-        <Route path="dms" element={<PageStub title="Business Documents" />} />
-        <Route path="doc-tracker" element={<PageStub title="Document Tracker" />} />
-        <Route path="payments" element={<PageStub title="Payments" />} />
-        <Route path="deadlines" element={<PageStub title="Deadline Tracker" />} />
-        <Route path="bonds" element={<PageStub title="Bid Bonds" />} />
-        <Route path="contracts" element={<PageStub title="Contracts & Milestones" />} />
-        <Route path="risks" element={<PageStub title="Risk Register" />} />
-        <Route path="approvals" element={<PageStub title="Approvals" />} />
-        <Route path="crm" element={<PageStub title="CRM Log" />} />
-        <Route path="reports" element={<PageStub title="Reports" />} />
-        <Route path="search" element={<PageStub title="Global Search" />} />
-        <Route path="audit" element={<PageStub title="Audit Trail" />} />
-        <Route path="profile" element={<PageStub title="Company Profile" />} />
-        <Route path="users" element={<PageStub title="Users & Roles" />} />
-        <Route path="settings" element={<PageStub title="Settings" />} />
+        <Route path="analytics" element={<Analytics />} />
+        <Route path="clients" element={<Clients />} />
+        <Route path="suppliers" element={<Suppliers />} />
+        <Route path="products" element={<Products />} />
+        <Route path="employees" element={<Employees />} />
+        <Route path="bulk-upload" element={<BulkUpload />} />
+        <Route path="tenders" element={<Tenders />} />
+        <Route path="tenders/:id" element={<TenderDetail />} />
+        <Route path="eligibility" element={<Eligibility />} />
+        <Route path="bid-decision" element={<BidDecision />} />
+        <Route path="estimation" element={<Estimation />} />
+        <Route path="documents" element={<DocumentCenter />} />
+        <Route path="documents/new/:type" element={<DocumentEditor />} />
+        <Route path="dms" element={<Dms />} />
+        <Route path="doc-tracker" element={<DocTracker />} />
+        <Route path="payments" element={<Payments />} />
+        <Route path="deadlines" element={<Deadlines />} />
+        <Route path="bonds" element={<Bonds />} />
+        <Route path="contracts" element={<Contracts />} />
+        <Route path="risks" element={<Risks />} />
+        <Route path="approvals" element={<Approvals />} />
+        <Route path="crm" element={<Crm />} />
+        <Route path="reports" element={<Reports />} />
+        <Route path="search" element={<Search />} />
+        <Route path="audit" element={<Audit />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="users" element={<Users />} />
+        <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
