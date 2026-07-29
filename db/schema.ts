@@ -5,6 +5,10 @@ import {
   varchar,
   text,
   timestamp,
+  json,
+  int,
+  primaryKey,
+  index,
   // bigint,
 } from "drizzle-orm/mysql-core";
 
@@ -38,3 +42,46 @@ export type InsertUser = typeof users.$inferInsert;
 //
 // Note: FK columns referencing a serial() PK must use:
 //   bigint("columnName", { mode: "number", unsigned: true }).notNull()
+
+// ---------------------------------------------------------------------------
+// FBV app data model — collection-based entity store.
+// Each frontend collection (clients, suppliers, tenders, …) is stored as rows
+// of (collection, id) with a JSON payload so all frontend extension fields are
+// preserved without schema churn.
+// ---------------------------------------------------------------------------
+
+export const entities = mysqlTable(
+  "entities",
+  {
+    id: varchar("id", { length: 80 }).notNull(),
+    collection: varchar("collection", { length: 40 }).notNull(),
+    data: json("data").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    primaryKey({ columns: [t.collection, t.id] }),
+    index("idx_entities_collection").on(t.collection),
+  ],
+);
+
+export type Entity = typeof entities.$inferSelect;
+
+/** Singleton key/value rows: 'profile' (CompanyProfile), 'settings' (Settings). */
+export const kvStore = mysqlTable("kv_store", {
+  k: varchar("k", { length: 40 }).primaryKey(),
+  data: json("data").notNull(),
+  updatedAt: timestamp("updatedAt")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+/** Atomic per-prefix document number sequences, e.g. 'FBV-QUO-2026' -> 4. */
+export const docSequences = mysqlTable("doc_sequences", {
+  prefix: varchar("prefix", { length: 30 }).primaryKey(),
+  value: int("value").notNull().default(0),
+});
