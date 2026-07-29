@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <defs>
+    <pattern id="contour" width="400" height="400" patternUnits="userSpaceOnUse">
+      <!-- diagonal contour lines, spaced for seamless tiling -->
+      <g stroke="#FFFFFF" stroke-opacity="0.04" stroke-width="1.2" fill="none">
+        <path d="M-100 500 L500 -100"/>
+        <path d="M-60 500 L500 -60"/>
+        <path d="M-20 500 L500 -20"/>
+        <path d="M20 500 L500 20"/>
+        <path d="M60 500 L500 60"/>
+        <path d="M100 500 L500 100"/>
+        <path d="M140 500 L500 140"/>
+        <path d="M180 500 L500 180"/>
+        <path d="M220 500 L500 220"/>
+        <path d="M260 500 L500 260"/>
+        <path d="M300 500 L500 300"/>
+        <path d="M340 500 L500 340"/>
+        <path d="M380 500 L500 380"/>
+        <path d="M420 500 L500 420"/>
+        <path d="M460 500 L500 460"/>
+      </g>
+      <!-- gentle topo wobble rings (periodic at 400) -->
+      <g stroke="#FFFFFF" stroke-opacity="0.03" stroke-width="1" fill="none">
+        <path d="M0 100 Q100 60 200 100 T400 100"/>
+        <path d="M0 140 Q100 100 200 140 T400 140"/>
+        <path d="M0 300 Q100 260 200 300 T400 300"/>
+        <path d="M0 340 Q100 300 200 340 T400 340"/>
+        <path d="M100 0 Q60 100 100 200 T100 400"/>
+        <path d="M300 0 Q260 100 300 200 T300 400"/>
+      </g>
+      <!-- sparse elevation dots -->
+      <g fill="#FFFFFF" fill-opacity="0.05">
+        <circle cx="100" cy="100" r="2"/><circle cx="300" cy="100" r="2"/>
+        <circle cx="100" cy="300" r="2"/><circle cx="300" cy="300" r="2"/>
+        <circle cx="200" cy="200" r="2"/><circle cx="0" cy="200" r="2"/>
+        <circle cx="400" cy="200" r="2"/><circle cx="200" cy="0" r="2"/>
+        <circle cx="200" cy="400" r="2"/>
+      </g>
+    </pattern>
+  </defs>
+  <rect width="400" height="400" fill="url(#contour)"/>
+</svg>
