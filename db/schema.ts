@@ -7,8 +7,8 @@ import {
   timestamp,
   json,
   int,
-  primaryKey,
   index,
+  uniqueIndex,
   // bigint,
 } from "drizzle-orm/mysql-core";
 
@@ -53,6 +53,9 @@ export type InsertUser = typeof users.$inferInsert;
 export const entities = mysqlTable(
   "entities",
   {
+    // Surrogate PK: TiDB clustered-index hints on varchar/composite PKs are not
+    // introspectable by drizzle-kit, so a serial PK keeps db:push idempotent.
+    rowId: serial("rowId").primaryKey(),
     id: varchar("id", { length: 80 }).notNull(),
     collection: varchar("collection", { length: 40 }).notNull(),
     data: json("data").notNull(),
@@ -63,7 +66,7 @@ export const entities = mysqlTable(
       .$onUpdate(() => new Date()),
   },
   (t) => [
-    primaryKey({ columns: [t.collection, t.id] }),
+    uniqueIndex("uq_entities_collection_id").on(t.collection, t.id),
     index("idx_entities_collection").on(t.collection),
   ],
 );
@@ -71,17 +74,27 @@ export const entities = mysqlTable(
 export type Entity = typeof entities.$inferSelect;
 
 /** Singleton key/value rows: 'profile' (CompanyProfile), 'settings' (Settings). */
-export const kvStore = mysqlTable("kv_store", {
-  k: varchar("k", { length: 40 }).primaryKey(),
-  data: json("data").notNull(),
-  updatedAt: timestamp("updatedAt")
-    .defaultNow()
-    .notNull()
-    .$onUpdate(() => new Date()),
-});
+export const kvStore = mysqlTable(
+  "kv_store",
+  {
+    rowId: serial("rowId").primaryKey(),
+    k: varchar("k", { length: 40 }).notNull(),
+    data: json("data").notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [uniqueIndex("uq_kv_k").on(t.k)],
+);
 
 /** Atomic per-prefix document number sequences, e.g. 'FBV-QUO-2026' -> 4. */
-export const docSequences = mysqlTable("doc_sequences", {
-  prefix: varchar("prefix", { length: 30 }).primaryKey(),
-  value: int("value").notNull().default(0),
-});
+export const docSequences = mysqlTable(
+  "doc_sequences",
+  {
+    rowId: serial("rowId").primaryKey(),
+    prefix: varchar("prefix", { length: 30 }).notNull(),
+    value: int("value").notNull().default(0),
+  },
+  (t) => [uniqueIndex("uq_seq_prefix").on(t.prefix)],
+);

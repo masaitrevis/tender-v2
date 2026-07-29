@@ -14,7 +14,7 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push"
+    "db:push": "node scripts/patch-drizzle-kit-tidb.mjs && drizzle-kit push"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

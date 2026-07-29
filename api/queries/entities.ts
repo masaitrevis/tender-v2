@@ -148,14 +148,23 @@ export async function importAll(dump: {
   sequences?: Record<string, number>;
 }) {
   const db = getDb();
+  const CHUNK = 200;
   await db.transaction(async (tx) => {
     await tx.delete(schema.entities);
-    for (const [collection, items] of Object.entries(dump.entities ?? {})) {
-      for (const item of items) {
-        const id = String((item as { id?: unknown }).id ?? "");
-        if (!id) continue;
-        await tx.insert(schema.entities).values({ collection, id, data: item as object });
-      }
+    // Flatten all collections into rows, then batch INSERTs in chunks of 200
+    // (same pattern as bulkUpsertEntities) instead of row-by-row inserts.
+    const rows = Object.entries(dump.entities ?? {}).flatMap(
+      ([collection, items]) =>
+        items
+          .map((item) => ({
+            collection,
+            id: String((item as { id?: unknown }).id ?? ""),
+            data: item as object,
+          }))
+          .filter((row) => row.id),
+    );
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      await tx.insert(schema.entities).values(rows.slice(i, i + CHUNK));
     }
     if (dump.kv?.profile != null) {
       await tx
@@ -169,13 +178,14 @@ export async function importAll(dump: {
         .values({ k: "settings", data: dump.kv.settings as object })
         .onDuplicateKeyUpdate({ set: { data: dump.kv.settings as object } });
     }
-    if (dump.sequences) {
-      for (const [prefix, value] of Object.entries(dump.sequences)) {
-        await tx
-          .insert(schema.docSequences)
-          .values({ prefix, value })
-          .onDuplicateKeyUpdate({ set: { value } });
-      }
+    // Fully reconcile sequences: wipe all existing rows, then insert the
+    // dump's — restore is exact (no stale prefixes survive an import).
+    await tx.delete(schema.docSequences);
+    const seqRows = Object.entries(dump.sequences ?? {}).map(
+      ([prefix, value]) => ({ prefix, value }),
+    );
+    for (let i = 0; i < seqRows.length; i += CHUNK) {
+      await tx.insert(schema.docSequences).values(seqRows.slice(i, i + CHUNK));
     }
   });
 }
