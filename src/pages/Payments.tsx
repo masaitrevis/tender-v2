@@ -14,7 +14,7 @@ import {
 import { Toaster, toast } from 'sonner';
 import type { ActivityEntry, FbvDocument, PaymentMethod } from '@/lib/store';
 import {
-  addItem, daysUntil, getState, mutateStore, nextDocNumber, nowISO, uid,
+  addItem, daysUntil, getState, mutateStore, reserveDocNumber, nowISO, uid,
   useStore, TODAY,
 } from '@/lib/store';
 import { formatDate, formatDateTime, formatKES, formatKESCompact } from '@/lib/format';
@@ -658,7 +658,7 @@ function RecordPaymentModal({
     setAmountStr(inv ? String(invoiceBalance(inv)) : '');
   };
 
-  const save = () => {
+  const save = async () => {
     if (!invoice) {
       setError('Please choose an invoice.');
       return;
@@ -677,8 +677,8 @@ function RecordPaymentModal({
     }
     const clientName = clientOf(getState(), invoice.clientId)?.name ?? 'client';
     const s = getState();
-    const payRef = nextDocNumber('FBV-PAY', s.settings.docYear, s);
-    const rctNo = nextDocNumber('FBV-RCT', s.settings.docYear, s);
+    const payRef = await reserveDocNumber('FBV-PAY', s.settings.docYear);
+    const rctNo = await reserveDocNumber('FBV-RCT', s.settings.docYear);
     mutateStore((draft) => {
       const inv = draft.documents.find((d) => d.id === invoice.id);
       if (!inv) return;

@@ -5,6 +5,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { getNeedsAttention, useStore, type AttentionItem } from '@/lib/store';
 import CommandPalette from '@/components/intelligence/CommandPalette';
 import { Pill, type Tone } from '@/components/shared';
+import { useAuth } from '@/hooks/useAuth';
+import { LOGIN_PATH } from '@/const';
 
 const CRUMB_LABEL: Record<string, string> = {
   '': 'Dashboard',
@@ -85,7 +87,14 @@ export default function Navbar() {
   }, []);
 
   const attention = useMemo(() => getNeedsAttention(state), [state]);
-  const user = state.users[0];
+  const { user: authUser, isAuthenticated, isLoading: authLoading, logout } = useAuth();
+
+  const initials = (authUser?.name ?? '')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('') || 'U';
 
   const segments = location.pathname.split('/').filter(Boolean);
   const crumbs = ['Home', ...segments.map((s, i) => CRUMB_LABEL[s] ?? (i > 0 ? s : s))];
@@ -174,16 +183,41 @@ export default function Navbar() {
         <div className="mx-1 h-6 w-px bg-app-border" />
 
         {/* User chip */}
+        {authLoading ? (
+          <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5" aria-hidden>
+            <span className="h-8 w-8 animate-pulse rounded-full bg-app-bg ring-1 ring-app-border" />
+            <span className="hidden sm:block">
+              <span className="block h-3 w-16 animate-pulse rounded bg-app-bg" />
+              <span className="mt-1 block h-2.5 w-10 animate-pulse rounded bg-app-bg" />
+            </span>
+          </div>
+        ) : !isAuthenticated ? (
+          <Link
+            to={LOGIN_PATH}
+            className="flex h-9 items-center gap-2 rounded-lg bg-action px-4 text-[13px] font-semibold text-white transition hover:bg-action-hover"
+          >
+            <User size={15} />
+            Sign in
+          </Link>
+        ) : (
         <div className="relative" ref={userRef}>
           <button
             onClick={() => setUserOpen((v) => !v)}
             className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-app-bg"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-800 text-[12px] font-bold text-white ring-2 ring-gold">
-              {user?.initials ?? 'AD'}
-            </span>
+            {authUser?.avatar ? (
+              <img
+                src={authUser.avatar}
+                alt={authUser.name ?? 'User'}
+                className="h-8 w-8 rounded-full object-cover ring-2 ring-gold"
+              />
+            ) : (
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-800 text-[12px] font-bold text-white ring-2 ring-gold">
+                {initials}
+              </span>
+            )}
             <span className="hidden text-left sm:block">
-              <span className="block text-[13px] font-semibold leading-4 text-app-ink">{user?.name?.split(' ')[0] ?? 'Admin'}</span>
+              <span className="block text-[13px] font-semibold leading-4 text-app-ink">{authUser?.name?.split(' ')[0] ?? 'User'}</span>
               <span className="block text-[11px] leading-4 text-app-muted">FBV</span>
             </span>
           </button>
@@ -197,15 +231,15 @@ export default function Navbar() {
                 className="absolute right-0 top-12 w-[200px] origin-top rounded-xl border border-app-border bg-white p-1.5 shadow-card-hover"
               >
                 {[
-                  { icon: <User size={15} />, label: 'Profile', to: '/profile' },
-                  { icon: <Settings size={15} />, label: 'Settings', to: '/settings' },
-                  { icon: <LogOut size={15} />, label: 'Sign out', to: '/login' },
+                  { icon: <User size={15} />, label: 'Profile', onClick: () => navigate('/profile') },
+                  { icon: <Settings size={15} />, label: 'Settings', onClick: () => navigate('/settings') },
+                  { icon: <LogOut size={15} />, label: 'Sign out', onClick: () => logout() },
                 ].map((it) => (
                   <button
                     key={it.label}
                     onClick={() => {
                       setUserOpen(false);
-                      navigate(it.to);
+                      it.onClick();
                     }}
                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium text-app-ink transition hover:bg-app-bg"
                   >
@@ -217,6 +251,7 @@ export default function Navbar() {
             )}
           </AnimatePresence>
         </div>
+        )}
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </header>

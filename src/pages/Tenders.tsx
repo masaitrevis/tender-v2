@@ -10,7 +10,7 @@ import {
   Gauge, MoreHorizontal, Plus, Search, Send, Trophy, UserPlus, XCircle,
 } from 'lucide-react';
 import {
-  useStore, updateItem, removeItem, addItem, nextDocNumber, nowISO, uid, daysUntil,
+  useStore, updateItem, removeItem, addItem, reserveDocNumber, nowISO, uid, daysUntil,
   logActivity, TODAY,
 } from '@/lib/store';
 import type { AppState, Tender, TenderStatus } from '@/lib/store';
@@ -205,9 +205,9 @@ export default function Tenders() {
     setMenuFor(null);
   };
 
-  const duplicateTender = (t: Tender) => {
+  const duplicateTender = async (t: Tender) => {
     const id = uid('tnd');
-    const refNo = nextDocNumber('FBV-TND');
+    const refNo = await reserveDocNumber('FBV-TND');
     addItem(
       'tenders',
       { ...t, id, refNo, title: `${t.title} (Copy)`, status: 'Open', createdAt: nowISO() },

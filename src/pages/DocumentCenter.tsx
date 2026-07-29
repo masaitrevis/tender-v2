@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import type { DocType, FbvDocument } from '@/lib/store';
-import { addItem, getState, nextDocNumber, uid, updateItem, useStore, TODAY } from '@/lib/store';
+import { addItem, getState, nextDocNumber, reserveDocNumber, uid, updateItem, useStore, TODAY } from '@/lib/store';
 import { formatDate, formatKES, formatKESCompact } from '@/lib/format';
 import {
   ConfirmDialog, EmptyState, Modal, PageHeader, Pill, StatChip,
@@ -169,9 +169,9 @@ export default function DocumentCenter() {
   /* ------------- actions ------------- */
   const openDoc = (d: FbvDocument) => navigate(`/documents/new/${d.type}?edit=${d.id}`);
 
-  const duplicateDoc = (d: FbvDocument) => {
+  const duplicateDoc = async (d: FbvDocument) => {
     const s = getState();
-    const docNo = nextDocNumber(s.settings.docPrefixes[d.type] ?? 'FBV-DOC');
+    const docNo = await reserveDocNumber(s.settings.docPrefixes[d.type] ?? 'FBV-DOC');
     const copy: FbvDocument = {
       ...d,
       id: uid('doc'),
@@ -192,11 +192,11 @@ export default function DocumentCenter() {
     toast.success(`Duplicated as ${docNo}`);
   };
 
-  const convertDoc = (d: FbvDocument) => {
+  const convertDoc = async (d: FbvDocument) => {
     const target = NEXT_STAGE[d.type];
     if (!target) return;
     const s = getState();
-    const newDoc = buildConvertedDoc(s, d, target);
+    const newDoc = await buildConvertedDoc(s, d, target);
     addItem('documents', newDoc, {
       action: 'Created', entity: DOC_META[target].label, entityRef: newDoc.docNo,
       details: `Converted ${d.docNo} → ${newDoc.docNo}`,

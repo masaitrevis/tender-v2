@@ -1,7 +1,8 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import Dashboard from '@/pages/Dashboard';
 import Login from '@/pages/Login';
+import NotFound from '@/pages/NotFound';
 import Analytics from '@/pages/Analytics';
 import Clients from '@/pages/Clients';
 import Suppliers from '@/pages/Suppliers';
@@ -65,7 +66,7 @@ export default function App() {
         <Route path="profile" element={<Profile />} />
         <Route path="users" element={<Users />} />
         <Route path="settings" element={<Settings />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
   );

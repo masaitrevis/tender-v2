@@ -1,13 +1,14 @@
 /**
  * FBV Tender & Contract Management System v2.0 — central data layer.
  *
- * Single localStorage-persisted store with seeded Kenyan demo data.
- * Any page imports `useStore()` to read state and the typed helpers
- * (`addItem`, `updateItem`, `removeItem`, `mutateStore`) to mutate it —
- * every mutation automatically appends an AuditTrail entry and a
- * Recent Activity entry and persists to localStorage.
+ * Server-synced store: the MySQL backend (tRPC `data` router) is the source
+ * of truth. Pages keep the same synchronous API (`useStore`, `addItem`, …) —
+ * mutations apply to an in-memory cache immediately (optimistic) and are
+ * flushed to the server in the background. localStorage survives only as a
+ * transient read-cache while the first hydration is in flight.
  */
 import { useSyncExternalStore } from 'react';
+import { api } from '@/lib/api';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -592,12 +593,74 @@ function seedState(): AppState {
 }
 
 /* ------------------------------------------------------------------ */
-/* Persistence + subscription engine                                   */
+/* Server-synced persistence + subscription engine                     */
 /* ------------------------------------------------------------------ */
 
+/** localStorage is now ONLY a transient read-cache while hydrating. */
 const STORAGE_KEY = 'fbv-tcms-v2-store';
 
-function load(): AppState {
+/** Window event name fired (non-blocking) when a background server sync fails. */
+export const SYNC_ERROR_EVENT = 'fbv:sync-error';
+
+const COLLECTION_KEYS: CollectionKey[] = [
+  'clients', 'suppliers', 'products', 'employees', 'tenders', 'documents',
+  'payments', 'deadlines', 'bonds', 'milestones', 'risks', 'approvals',
+  'crm', 'audit', 'dms', 'users', 'activity',
+];
+
+/** Backup dump shape exchanged with data.exportAll / importAll / seedIfEmpty. */
+interface ServerDump {
+  entities: Record<string, unknown[]>;
+  kv?: { profile?: unknown; settings?: unknown };
+  sequences?: Record<string, number>;
+}
+
+/** Highest issued number per `${prefix}${year}` (e.g. FBV-QUO2026 → 3). */
+function computeSequences(s: AppState): Record<string, number> {
+  const out: Record<string, number> = {};
+  const scan = (no: string | undefined) => {
+    const m = no?.match(/^(FBV-[A-Z]+)-(\d{4})-(\d+)$/);
+    if (!m) return;
+    const key = `${m[1]}${m[2]}`;
+    const n = parseInt(m[3], 10);
+    if (!Number.isNaN(n) && n > (out[key] ?? 0)) out[key] = n;
+  };
+  s.documents.forEach((d) => scan(d.docNo));
+  s.tenders.forEach((t) => scan(t.refNo));
+  s.payments.forEach((p) => scan(p.refNo));
+  s.bonds.forEach((b) => scan(b.refNo));
+  s.approvals.forEach((a) => scan(a.refNo));
+  s.risks.forEach((r) => scan(r.refNo));
+  return out;
+}
+
+function stateToDump(s: AppState): ServerDump {
+  const entities: Record<string, unknown[]> = {};
+  COLLECTION_KEYS.forEach((k) => {
+    entities[k] = s[k];
+  });
+  return { entities, kv: { profile: s.profile, settings: s.settings }, sequences: computeSequences(s) };
+}
+
+/** Merge a server dump onto a fallback state (used for hydrate + export). */
+function dumpToState(
+  dump: { entities: Record<string, unknown[]>; profile?: unknown; settings?: unknown },
+  kv?: { profile?: unknown; settings?: unknown } | null,
+  fallback: AppState = state,
+): AppState {
+  const st: AppState = { ...fallback };
+  COLLECTION_KEYS.forEach((k) => {
+    const list = dump.entities?.[k];
+    (st as unknown as Record<string, unknown>)[k] = Array.isArray(list) ? list : [];
+  });
+  const profile = dump.profile ?? kv?.profile;
+  const settings = dump.settings ?? kv?.settings;
+  if (profile && typeof profile === 'object') st.profile = profile as CompanyProfile;
+  if (settings && typeof settings === 'object') st.settings = settings as Settings;
+  return st;
+}
+
+function loadCache(): AppState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -605,18 +668,12 @@ function load(): AppState {
       if (parsed && parsed.version === 1) return parsed;
     }
   } catch {
-    /* corrupted storage — reseed */
+    /* corrupted cache — fall through to seed */
   }
-  const seeded = seedState();
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
-  } catch {
-    /* storage full */
-  }
-  return seeded;
+  return null;
 }
 
-let state: AppState = load();
+let state: AppState = loadCache() ?? seedState();
 const listeners = new Set<() => void>();
 
 function subscribe(fn: () => void): () => void {
@@ -624,13 +681,18 @@ function subscribe(fn: () => void): () => void {
   return () => listeners.delete(fn);
 }
 
-function persist() {
+function persistCache() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // localStorage quota exceeded — keep in-memory state; Settings shows a meter
-    console.warn('FBV store: localStorage write failed (quota exceeded?)');
+    // transient cache full — the server copy is unaffected
+    console.warn('FBV store: localStorage cache write failed (quota exceeded?)');
   }
+}
+
+function emit() {
+  persistCache();
+  listeners.forEach((l) => l());
 }
 
 /** React hook — re-renders the component whenever any part of the store changes. */
@@ -641,6 +703,153 @@ export function useStore(): AppState {
 /** Non-React read of the current state (charts, exports, helpers). */
 export function getState(): AppState {
   return state;
+}
+
+/* ------------------------------------------------------------------ */
+/* Hydration + background sync                                         */
+/* ------------------------------------------------------------------ */
+
+/** Server-side sequence mirror — keeps sync previews ahead of reserved numbers. */
+let serverSequences: Record<string, number> = {};
+/** Ids mutated locally whose server write is still in flight (`${collection}:${id}`). */
+const pendingIds = new Set<string>();
+
+let syncEnabled = false;
+let hydratePromise: Promise<void> | null = null;
+let syncQueue: Promise<void> = Promise.resolve();
+
+function notifySyncError(err: unknown) {
+  console.error('FBV store: server sync failed — re-hydrating from server.', err);
+  try {
+    window.dispatchEvent(
+      new CustomEvent(SYNC_ERROR_EVENT, {
+        detail: err instanceof Error ? err.message : String(err),
+      }),
+    );
+  } catch {
+    /* non-DOM environment */
+  }
+}
+
+/** Order remote items like the local cache; keep optimistic (pending) local items. */
+function mergeRemote(local: AppState, remote: AppState): AppState {
+  const merged: AppState = { ...remote };
+  COLLECTION_KEYS.forEach((k) => {
+    const localList = local[k] as Array<{ id: string }>;
+    const remoteList = remote[k] as Array<{ id: string }>;
+    const pos = new Map(localList.map((it, i) => [it.id, i]));
+    const known = remoteList.filter((it) => pos.has(it.id));
+    known.sort((a, b) => (pos.get(a.id) ?? 0) - (pos.get(b.id) ?? 0));
+    const unknownRemote = remoteList.filter((it) => !pos.has(it.id));
+    const remoteIds = new Set(remoteList.map((it) => it.id));
+    const pendingLocal = localList.filter(
+      (it) => pendingIds.has(`${k}:${it.id}`) && !remoteIds.has(it.id),
+    );
+    (merged as unknown as Record<string, unknown>)[k] = [...pendingLocal, ...unknownRemote, ...known];
+  });
+  return merged;
+}
+
+async function hydrate(): Promise<void> {
+  try {
+    let remote = await api.data.getState.query();
+    const isEmpty = COLLECTION_KEYS.every((k) => (remote.entities?.[k] ?? []).length === 0);
+    if (isEmpty) {
+      // First run for this account — seed the demo dataset, then read it back.
+      await api.data.seedIfEmpty.mutate({ dump: stateToDump(seedState()) });
+      remote = await api.data.getState.query();
+    }
+    serverSequences = { ...(remote.sequences ?? {}) };
+    const remoteState = dumpToState(remote, null, state);
+    state = mergeRemote(state, remoteState);
+    emit();
+  } catch (err) {
+    console.error('FBV store: hydration failed (offline or signed out).', err);
+  }
+}
+
+/**
+ * Enable server sync and perform the first hydration.
+ * Called from the app shell once the user is authenticated.
+ */
+export function syncStore(): void {
+  if (syncEnabled) return;
+  syncEnabled = true;
+  hydratePromise = hydrate();
+}
+
+/** Re-read the full state from the server (used after imports/resets). */
+export async function refreshFromServer(): Promise<void> {
+  if (!syncEnabled) return;
+  await (hydratePromise ?? Promise.resolve());
+  hydratePromise = hydrate();
+  await hydratePromise;
+}
+
+interface SyncOps {
+  upserts: Partial<Record<CollectionKey, Array<{ id: string }>>>;
+  removals: Array<{ collection: CollectionKey; id: string }>;
+  profile: boolean;
+  settings: boolean;
+}
+
+/** Diff two states collection-by-collection into server operations. */
+function diffStates(prev: AppState, next: AppState): SyncOps {
+  const upserts: Partial<Record<CollectionKey, Array<{ id: string }>>> = {};
+  const removals: Array<{ collection: CollectionKey; id: string }> = [];
+  COLLECTION_KEYS.forEach((k) => {
+    const before = new Map((prev[k] as Array<{ id: string }>).map((it) => [it.id, it]));
+    const changed: Array<{ id: string }> = [];
+    (next[k] as Array<{ id: string }>).forEach((it) => {
+      if (before.get(it.id) !== it) changed.push(it);
+      before.delete(it.id);
+    });
+    if (changed.length > 0) upserts[k] = changed;
+    before.forEach((_item, id) => removals.push({ collection: k, id }));
+  });
+  return {
+    upserts,
+    removals,
+    profile: prev.profile !== next.profile,
+    settings: prev.settings !== next.settings,
+  };
+}
+
+/** Queue background server writes; on failure surface an event and re-hydrate. */
+function enqueueSync(ops: SyncOps): void {
+  if (!syncEnabled) return;
+  const touched: string[] = [];
+  (Object.entries(ops.upserts) as Array<[CollectionKey, Array<{ id: string }>]>).forEach(([k, items]) => {
+    items.forEach((it) => touched.push(`${k}:${it.id}`));
+  });
+  ops.removals.forEach((r) => touched.push(`${r.collection}:${r.id}`));
+  if (touched.length === 0 && !ops.profile && !ops.settings) return;
+  touched.forEach((key) => pendingIds.add(key));
+
+  const run = async () => {
+    await (hydratePromise ?? Promise.resolve()); // flush in order after hydration
+    const tasks: Array<Promise<unknown>> = [];
+    (Object.entries(ops.upserts) as Array<[CollectionKey, Array<{ id: string }>]>).forEach(([collection, items]) => {
+      if (items.length > 0) tasks.push(api.data.bulkUpsert.mutate({ collection, items }));
+    });
+    ops.removals.forEach((r) => {
+      tasks.push(api.data.remove.mutate({ collection: r.collection, id: r.id }));
+    });
+    if (ops.profile) tasks.push(api.data.updateProfile.mutate({ profile: state.profile }));
+    if (ops.settings) tasks.push(api.data.updateSettings.mutate({ settings: state.settings }));
+    await Promise.all(tasks);
+  };
+
+  syncQueue = syncQueue.then(run).then(
+    () => {
+      touched.forEach((key) => pendingIds.delete(key));
+    },
+    (err: unknown) => {
+      touched.forEach((key) => pendingIds.delete(key));
+      notifySyncError(err);
+      if (syncEnabled) hydratePromise = hydrate();
+    },
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -684,6 +893,7 @@ function refOf(item: unknown): string {
 
 /** Low-level mutate: transform the state inside a transaction; logs audit + activity. */
 export function mutateStore(fn: (draft: AppState) => void, log?: MutationLog): void {
+  const prev = state;
   const draft: AppState = JSON.parse(JSON.stringify(state)) as AppState;
   fn(draft);
   const ts = nowISO();
@@ -703,8 +913,8 @@ export function mutateStore(fn: (draft: AppState) => void, log?: MutationLog): v
     if (draft.activity.length > 200) draft.activity.length = 200;
   }
   state = draft;
-  persist();
-  listeners.forEach((l) => l());
+  emit();
+  enqueueSync(diffStates(prev, draft));
 }
 
 /** Insert an item at the front of a collection (audit + activity logged). */
@@ -774,27 +984,58 @@ export function logActivity(log: MutationLog & { entity: string; entityRef: stri
   mutateStore(() => undefined, log);
 }
 
-/** Wipe storage and reseed demo data. */
-export function resetToSeed(): void {
-  state = seedState();
-  persist();
-  listeners.forEach((l) => l());
+/** Reset to the demo dataset — locally now, on the server via data.importAll. */
+export async function resetToSeed(): Promise<void> {
+  const seeded = seedState();
+  pendingIds.clear();
+  state = seeded;
+  emit();
+  if (!syncEnabled) return;
+  try {
+    await api.data.importAll.mutate({ dump: stateToDump(seeded) });
+    await refreshFromServer();
+  } catch (err) {
+    notifySyncError(err);
+  }
 }
 
-/** Full JSON export (backup / Settings "Download data"). */
-export function exportJSON(): string {
+/**
+ * Full JSON export (backup / Settings "Download data").
+ * Backed by data.exportAll; falls back to the local cache when offline.
+ */
+export async function exportJSON(): Promise<string> {
+  if (syncEnabled) {
+    try {
+      const dump = await api.data.exportAll.query();
+      return JSON.stringify(dumpToState(dump.entities ? { entities: dump.entities } : { entities: {} }, dump.kv, state), null, 2);
+    } catch (err) {
+      console.error('FBV store: exportAll failed — exporting local cache instead.', err);
+    }
+  }
   return JSON.stringify(state, null, 2);
 }
 
-/** Restore from a JSON export. Throws on invalid payload. */
-export function importJSON(text: string): void {
+/**
+ * Restore from a JSON export (Settings "Restore backup").
+ * Applies locally, then replaces server data via data.importAll and re-hydrates.
+ * Throws on invalid payload.
+ */
+export async function importJSON(text: string): Promise<void> {
   const parsed = JSON.parse(text) as AppState;
   if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as AppState).clients)) {
     throw new Error('That file is not a valid FBV backup. Please choose the JSON file exported from Settings.');
   }
-  state = parsed;
-  persist();
-  listeners.forEach((l) => l());
+  const normalized: AppState = { ...seedState(), ...parsed };
+  pendingIds.clear();
+  state = normalized;
+  emit();
+  if (!syncEnabled) return;
+  try {
+    await api.data.importAll.mutate({ dump: stateToDump(normalized) });
+    await refreshFromServer();
+  } catch (err) {
+    notifySyncError(err);
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -819,7 +1060,11 @@ export function alertLevel(dateIso: string | undefined | null, settings?: Settin
   return 'OK';
 }
 
-/** Next document number for a prefix, e.g. nextDocNumber('FBV-QUO', 2026) → 'FBV-QUO-2026-004'. */
+/**
+ * Preview of the next document number for a prefix, e.g. nextDocNumber('FBV-QUO', 2026)
+ * → 'FBV-QUO-2026-004'. Synchronous — for display/preview only. Commit paths must
+ * use `reserveDocNumber` (server-side atomic) instead.
+ */
 export function nextDocNumber(prefix: string, year?: number, s?: AppState): string {
   const st = s ?? state;
   const yr = year ?? st.settings.docYear;
@@ -836,7 +1081,24 @@ export function nextDocNumber(prefix: string, year?: number, s?: AppState): stri
   st.payments.forEach((p) => scan(p.refNo));
   st.bonds.forEach((b) => scan(b.refNo));
   st.approvals.forEach((a) => scan(a.refNo));
-  return `${head}${String(max + 1).padStart(3, '0')}`;
+  const reserved = serverSequences[`${prefix}${yr}`] ?? 0;
+  return `${head}${String(Math.max(max, reserved) + 1).padStart(3, '0')}`;
+}
+
+/**
+ * Reserve the next document number on the server (atomic sequence increment).
+ * Falls back to local numbering when the server is unreachable.
+ */
+export async function reserveDocNumber(prefix: string, year?: number): Promise<string> {
+  const yr = year ?? state.settings.docYear;
+  try {
+    const res = await api.data.nextDocNumber.mutate({ prefix, year: yr });
+    serverSequences = { ...serverSequences, [`${prefix}${yr}`]: res.value };
+    return res.number;
+  } catch (err) {
+    console.error('FBV store: reserveDocNumber failed — falling back to local numbering.', err);
+    return nextDocNumber(prefix, yr);
+  }
 }
 
 export interface DashboardKPIs {
@@ -989,13 +1251,13 @@ export function readFileAsBase64(file: File): Promise<{ fileName: string; fileDa
   });
 }
 
-/** Bytes currently used by the store in localStorage (Settings storage meter). */
+/** Approximate bytes used by the cached dataset (Settings storage meter). */
 export function storageUsage(): { used: number; quota: number; ratio: number } {
   let used = 0;
   try {
-    used = new Blob([localStorage.getItem(STORAGE_KEY) ?? '']).size;
+    used = new Blob([JSON.stringify(state)]).size;
   } catch { /* ignore */ }
-  const quota = 5 * 1024 * 1024; // typical localStorage quota
+  const quota = 5 * 1024 * 1024; // display quota for the meter
   return { used, quota, ratio: used / quota };
 }
 

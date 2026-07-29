@@ -12,7 +12,7 @@ import {
 import { Toaster, toast } from 'sonner';
 import type { Approval, DocType, FbvDocument } from '@/lib/store';
 import {
-  addItem, getState, mutateStore, nextDocNumber, nowISO, readFileAsBase64,
+  addItem, getState, mutateStore, nextDocNumber, reserveDocNumber, nowISO, readFileAsBase64,
   removeItem, uid, updateItem, useStore, TODAY,
 } from '@/lib/store';
 import { formatKES, vatAmount } from '@/lib/format';
@@ -220,7 +220,7 @@ export default function DocumentEditor() {
   }
 
   /** Save (create or update). Returns the document id, or null on validation failure. */
-  function saveDraft(quiet = false): string | null {
+  async function saveDraft(quiet = false): Promise<string | null> {
     const err = validate();
     if (err) {
       toast.error(err);
@@ -237,7 +237,7 @@ export default function DocumentEditor() {
       });
     } else {
       id = uid('doc');
-      const no = nextDocNumber(s.settings.docPrefixes[docType!] ?? 'FBV-DOC', s.settings.docYear, s);
+      const no = await reserveDocNumber(s.settings.docPrefixes[docType!] ?? 'FBV-DOC', s.settings.docYear);
       const doc = assembleDoc('Draft', id, no);
       addItem('documents', doc, {
         action: 'Created', entity: meta!.label, entityRef: no,
@@ -291,8 +291,8 @@ export default function DocumentEditor() {
     setDocExtras(docId, updated);
   }
 
-  function submitForApproval() {
-    const id = saveDraft(true) ?? existing?.id;
+  async function submitForApproval() {
+    const id = (await saveDraft(true)) ?? existing?.id;
     if (!id) return;
     const s = getState();
     const doc = s.documents.find((d) => d.id === id);
@@ -300,7 +300,7 @@ export default function DocumentEditor() {
     const partyName = resolveParty(s, docType!, doc.clientId)?.name ?? '';
     const apr: Approval = {
       id: uid('apr'),
-      refNo: nextDocNumber('FBV-APR', s.settings.docYear, s),
+      refNo: await reserveDocNumber('FBV-APR', s.settings.docYear),
       type: meta!.label,
       title: `${doc.docNo} — ${meta!.label} to ${partyName}`,
       amount: doc.total,
@@ -344,12 +344,12 @@ export default function DocumentEditor() {
     toast.success(`${existing.docNo} issued`);
   }
 
-  function convertDoc() {
+  async function convertDoc() {
     if (!existing || !docType) return;
     const target = NEXT_STAGE[docType];
     if (!target) return;
     const s = getState();
-    const newDoc = buildConvertedDoc(s, existing, target);
+    const newDoc = await buildConvertedDoc(s, existing, target);
     addItem('documents', newDoc, {
       action: 'Created', entity: DOC_META[target].label, entityRef: newDoc.docNo,
       details: `Converted ${existing.docNo} → ${newDoc.docNo}`,

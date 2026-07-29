@@ -149,12 +149,12 @@ export function docTenderRef(s: AppState, doc: FbvDocument): string | undefined 
 /* Conversion chain — carry client, lines and totals forward           */
 /* ------------------------------------------------------------------ */
 
-import { nextDocNumber, uid, TODAY } from '@/lib/store';
+import { reserveDocNumber, uid, TODAY } from '@/lib/store';
 
 /** Build the next-stage document (QUO→PRO→INV→RCT; PO/CON→INV). Pure — caller adds it. */
-export function buildConvertedDoc(s: AppState, source: FbvDocument, target: DocType): FbvDocument {
+export async function buildConvertedDoc(s: AppState, source: FbvDocument, target: DocType): Promise<FbvDocument> {
   const prefix = s.settings.docPrefixes[target] ?? 'FBV-DOC';
-  const docNo = nextDocNumber(prefix, s.settings.docYear, s);
+  const docNo = await reserveDocNumber(prefix, s.settings.docYear);
   const base = {
     id: uid('doc'),
     docNo,

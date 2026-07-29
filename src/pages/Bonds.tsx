@@ -9,7 +9,7 @@ import {
   Landmark, Lock, Unlock, Clock, Plus, Download, MoreHorizontal, Building2, ShieldCheck, Paperclip,
 } from 'lucide-react';
 import {
-  useStore, addItem, updateItem, uid, daysUntil, nextDocNumber, nowISO, readFileAsBase64,
+  useStore, addItem, updateItem, uid, daysUntil, nextDocNumber, reserveDocNumber, nowISO, readFileAsBase64,
   type Bond,
 } from '@/lib/store';
 import { formatKES, formatKESCompact, formatDate } from '@/lib/format';
@@ -237,9 +237,10 @@ function NewBondModal({ open, onClose, onSaved }: { open: boolean; onClose: () =
     if (!amount || Number(amount) <= 0) return setError('Amount must be a positive number');
     if (!expiryDate) return setError('Expiry date is required');
     const tender = s.tenders.find((t) => t.id === tenderId);
+    const reservedNo = await reserveDocNumber('FBV-BND');
     const bond: Bond = {
       id: uid('bnd'),
-      refNo: bondNo,
+      refNo: reservedNo,
       tenderId: tender?.id,
       tenderTitle: tender?.title ?? 'Unlinked security',
       kind,
@@ -250,8 +251,8 @@ function NewBondModal({ open, onClose, onSaved }: { open: boolean; onClose: () =
       status: 'Active',
     };
     addItem('bonds', bond, {
-      action: 'Created', entity: 'Bond', entityRef: bondNo,
-      details: `${kind} ${bondNo} registered — ${issuer.trim()} (${formatKES(Number(amount))})`, verb: 'Created', verbColor: 'grey',
+      action: 'Created', entity: 'Bond', entityRef: reservedNo,
+      details: `${kind} ${reservedNo} registered — ${issuer.trim()} (${formatKES(Number(amount))})`, verb: 'Created', verbColor: 'grey',
     });
     // Optional scan → DMS vault
     if (file) {
@@ -260,8 +261,8 @@ function NewBondModal({ open, onClose, onSaved }: { open: boolean; onClose: () =
         addItem('dms', {
           id: uid('dms'),
           docType: 'other',
-          refNo: bondNo,
-          title: `${kind} — ${bondNo}`,
+          refNo: reservedNo,
+          title: `${kind} — ${reservedNo}`,
           issuer: issuer.trim(),
           issueDate,
           expiryDate,
@@ -271,7 +272,7 @@ function NewBondModal({ open, onClose, onSaved }: { open: boolean; onClose: () =
           notes: `Bid bond scan attached from Bond Tracker (${bond.tenderTitle})`,
           createdAt: nowISO(),
         }, {
-          action: 'Created', entity: 'Business Document', entityRef: bondNo,
+          action: 'Created', entity: 'Business Document', entityRef: reservedNo,
           details: `Bond scan filed to DMS vault — ${fileName}`, verb: 'Uploaded', verbColor: 'navy',
         });
       } catch (err) {
@@ -279,7 +280,7 @@ function NewBondModal({ open, onClose, onSaved }: { open: boolean; onClose: () =
         return;
       }
     }
-    onSaved(bondNo);
+    onSaved(reservedNo);
     setTenderId(''); setIssuer(''); setAmount(''); setExpiryDate(''); setFile(null); setError('');
     onClose();
   };

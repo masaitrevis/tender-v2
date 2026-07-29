@@ -10,7 +10,7 @@ import {
   GripVertical, Plus, Table2, Trash2,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { useStore, addItem, nextDocNumber, nowISO, uid, TODAY } from '@/lib/store';
+import { useStore, addItem, reserveDocNumber, nowISO, uid, TODAY } from '@/lib/store';
 import type { DocumentLine, Product } from '@/lib/store';
 import { formatDateTime, formatKES, formatKESCompact } from '@/lib/format';
 import { PageHeader, Pill, SelectInput } from '@/components/shared';
@@ -188,7 +188,7 @@ export default function Estimation() {
     return est;
   };
 
-  const generateQuotation = () => {
+  const generateQuotation = async () => {
     if (!tender) return;
     const est = save() ?? currentEstimate();
     const lines: DocumentLine[] = [];
@@ -217,7 +217,7 @@ export default function Estimation() {
     }
     const subtotal = r2(lines.reduce((s, l) => s + l.amount, 0));
     const vatAmount = r2(subtotal * (state.settings.vatRate / 100));
-    const docNo = nextDocNumber('FBV-QUO');
+    const docNo = await reserveDocNumber('FBV-QUO');
     addItem('documents', {
       id: uid('doc'),
       docNo,

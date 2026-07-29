@@ -11,7 +11,7 @@ import {
   Plus, Scale, Trash2, Trophy,
 } from 'lucide-react';
 import {
-  useStore, updateItem, removeItem, addItem, nextDocNumber, nowISO, uid, daysUntil, TODAY,
+  useStore, updateItem, removeItem, addItem, reserveDocNumber, nowISO, uid, daysUntil, TODAY,
 } from '@/lib/store';
 import type { ActivityEntry, TenderStatus } from '@/lib/store';
 import { formatKES, formatKESCompact, formatDate, formatDateTime } from '@/lib/format';
@@ -135,8 +135,8 @@ export default function TenderDetail() {
     else applyStatus(s);
   };
 
-  const generateContract = () => {
-    const docNo = nextDocNumber('FBV-CON');
+  const generateContract = async () => {
+    const docNo = await reserveDocNumber('FBV-CON');
     const subtotal = tender.value;
     const vatAmount = Math.round(subtotal * (state.settings.vatRate / 100) * 100) / 100;
     addItem('documents', {
@@ -162,9 +162,9 @@ export default function TenderDetail() {
     setContractDocNo(docNo);
   };
 
-  const duplicate = () => {
+  const duplicate = async () => {
     const newId = uid('tnd');
-    const refNo = nextDocNumber('FBV-TND');
+    const refNo = await reserveDocNumber('FBV-TND');
     addItem('tenders', { ...tender, id: newId, refNo, title: `${tender.title} (Copy)`, status: 'Open', createdAt: nowISO() }, {
       entityRef: refNo, details: `Duplicated tender ${tender.refNo} → ${refNo}`, verb: 'Created', verbColor: 'grey',
     });
@@ -710,12 +710,12 @@ function AddRiskModal({
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
 
-  const save = () => {
+  const save = async () => {
     if (!title.trim()) {
       setError('Risk title is required.');
       return;
     }
-    const refNo = nextDocNumber('FBV-RSK');
+    const refNo = await reserveDocNumber('FBV-RSK');
     addItem('risks', {
       id: uid('rsk'),
       refNo,

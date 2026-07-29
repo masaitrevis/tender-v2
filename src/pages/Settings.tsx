@@ -604,8 +604,8 @@ function DataTab({ state }: { state: AppState }) {
 
   const warn = usage.ratio > 0.8;
 
-  const doExport = () => {
-    const blob = new Blob([exportJSON()], { type: 'application/json' });
+  const doExport = async () => {
+    const blob = new Blob([await exportJSON()], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `fbv-backup-${TODAY}.json`;
@@ -624,9 +624,9 @@ function DataTab({ state }: { state: AppState }) {
     reader.readAsText(file);
   };
 
-  const confirmImport = () => {
+  const confirmImport = async () => {
     try {
-      importJSON(importText);
+      await importJSON(importText);
       setImportText('');
       setDone('Backup restored.');
       setTimeout(() => setDone(''), 3000);

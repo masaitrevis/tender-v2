@@ -6,7 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, Check, Scale, Send } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
-import { useStore, addItem, nextDocNumber, nowISO, uid } from '@/lib/store';
+import { useStore, addItem, reserveDocNumber, nowISO, uid } from '@/lib/store';
 import { formatDateTime, formatKESCompact } from '@/lib/format';
 import { PageHeader, Pill, TextareaInput } from '@/components/shared';
 import {
@@ -126,9 +126,9 @@ export default function BidDecision() {
     );
   };
 
-  const submitForApproval = () => {
+  const submitForApproval = async () => {
     if (!tender) return;
-    const refNo = nextDocNumber('FBV-APR');
+    const refNo = await reserveDocNumber('FBV-APR');
     addItem('approvals', {
       id: uid('apr'),
       refNo,

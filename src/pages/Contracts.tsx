@@ -10,7 +10,7 @@ import {
   AlertTriangle, FileText, ReceiptText, GitPullRequest, Lock,
 } from 'lucide-react';
 import {
-  useStore, addItem, updateItem, uid, daysUntil, nowISO, nextDocNumber, TODAY,
+  useStore, addItem, updateItem, uid, daysUntil, nowISO, reserveDocNumber, TODAY,
   type ContractMilestone, type FbvDocument,
 } from '@/lib/store';
 import { formatKES, formatKESCompact, formatDate } from '@/lib/format';
@@ -280,9 +280,9 @@ function ContractDrawer({ contract, onClose, onToast, onGoInvoice }: {
     setMsTitle(''); setMsDate(''); setMsAmount(''); setAddMsOpen(false);
   };
 
-  const addVariation = () => {
+  const addVariation = async () => {
     if (!voTitle.trim()) return;
-    const refNo = nextDocNumber('FBV-APR');
+    const refNo = await reserveDocNumber('FBV-APR');
     addItem('approvals', {
       id: uid('apr'),
       refNo,
@@ -549,13 +549,13 @@ function NewContractModal({ open, onClose, onSaved }: { open: boolean; onClose: 
   const [issueDate, setIssueDate] = useState(nowISO().slice(0, 10));
   const [error, setError] = useState('');
 
-  const save = () => {
+  const save = async () => {
     if (!clientId) return setError('Client is required');
     if (!title.trim()) return setError('Contract title is required');
     if (!value || Number(value) <= 0) return setError('Value must be a positive number');
     const gross = Number(value);
     const net = Math.round((gross / 1.16) * 100) / 100;
-    const docNo = nextDocNumber('FBV-CON');
+    const docNo = await reserveDocNumber('FBV-CON');
     const doc: FbvDocument = {
       id: uid('doc'),
       docNo,

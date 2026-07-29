@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard, BarChart3, Building2, Truck, Package, IdCard, FileSpreadsheet,
   FolderKanban, ClipboardCheck, Scale, Calculator, FileText, ShieldCheck, FileSearch,
@@ -12,6 +12,9 @@ import Navbar from './Navbar';
 import Footer from './Footer';
 import { NewPill } from '@/components/shared';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { LOGIN_PATH } from '@/const';
+import { syncStore } from '@/lib/store';
 
 interface NavItem {
   label: string;
@@ -92,7 +95,18 @@ const NAV: NavGroup[] = [
 /** AppShell: dark navy sidebar (sticky, in normal flow) + topbar + outlet scroll region + footer. */
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
-  const navigate = useNavigate();
+  const { isAuthenticated, isLoading, logout } = useAuth({
+    redirectOnUnauthenticated: true,
+    redirectPath: LOGIN_PATH,
+  });
+
+  // Hydrate the server-synced store only once authenticated (avoids
+  // UNAUTHORIZED noise on the login screen).
+  useEffect(() => {
+    if (isAuthenticated) syncStore();
+  }, [isAuthenticated]);
+
+  if (isLoading || !isAuthenticated) return null; // redirect handled by useAuth
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-app-bg">
@@ -155,7 +169,7 @@ export default function Layout() {
         {/* Bottom: collapse + sign out */}
         <div className="border-t border-white/10 p-3">
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => logout()}
             className={cn(
               'mb-1 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-white/75 transition-colors hover:bg-white/[.06] hover:text-white',
               collapsed && 'justify-center px-0',

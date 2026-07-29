@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import {
-  addItem, updateItem, nextDocNumber, nowISO, uid, TODAY, useStore,
+  addItem, updateItem, nextDocNumber, reserveDocNumber, nowISO, uid, TODAY, useStore,
 } from '@/lib/store';
 import type { Tender, TenderStatus } from '@/lib/store';
 import {
@@ -136,7 +136,7 @@ export function TenderFormDrawer({
     return Object.keys(e).length === 0;
   };
 
-  const save = (runEligibility: boolean) => {
+  const save = async (runEligibility: boolean) => {
     if (!validate()) return;
     const extrasPatch = {
       department: form.department || undefined,
@@ -172,11 +172,12 @@ export function TenderFormDrawer({
       onSaved?.(tender.id, runEligibility);
     } else {
       const id = uid('tnd');
+      const reservedRefNo = await reserveDocNumber('FBV-TND');
       addItem(
         'tenders',
         {
           id,
-          refNo,
+          refNo: reservedRefNo,
           title: form.title.trim(),
           clientId,
           category: form.category,
@@ -188,8 +189,8 @@ export function TenderFormDrawer({
           createdAt: nowISO(),
         },
         {
-          entityRef: refNo,
-          details: `Created tender — ${refNo} (${form.title.trim()})`,
+          entityRef: reservedRefNo,
+          details: `Created tender — ${reservedRefNo} (${form.title.trim()})`,
           verb: 'Created',
           verbColor: 'grey',
         },
