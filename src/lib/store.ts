@@ -660,6 +660,16 @@ function dumpToState(
   return st;
 }
 
+/** Drop the localStorage cache — used after a server-side full wipe so stale
+ *  demo data cannot reappear before the next hydration. */
+export function clearLocalCache(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 function loadCache(): AppState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import {
   useStore, updateSettings, resetToSeed, exportJSON, importJSON, storageUsage,
-  mutateStore, nextDocNumber, refreshFromServer, TODAY, type AppState,
+  mutateStore, nextDocNumber, refreshFromServer, clearLocalCache, TODAY, type AppState,
 } from '@/lib/store';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
@@ -598,6 +598,9 @@ function DataTab({ state }: { state: AppState }) {
     try {
       await api.data.clearAll.mutate({ includeProfile: wipeIncludeProfile });
       await refreshFromServer();
+      // Belt and braces: drop the browser cache too, so no stale copy of the
+      // wiped data can be shown before the post-reload hydration completes.
+      clearLocalCache();
       window.location.reload();
     } catch (err) {
       setWipeError(err instanceof Error ? err.message : 'Clear failed. Please try again.');
