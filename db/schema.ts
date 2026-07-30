@@ -18,6 +18,10 @@ export const users = mysqlTable("users", {
   name: varchar("name", { length: 255 }),
   email: varchar("email", { length: 320 }),
   avatar: text("avatar"),
+  // Local (username/password) login — used on self-hosted deployments where
+  // Kimi OAuth is unavailable. Null for pure Kimi-OAuth users.
+  username: varchar("username", { length: 120 }).unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")

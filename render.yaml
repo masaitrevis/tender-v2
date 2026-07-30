@@ -33,3 +33,10 @@ services:
         sync: false
       - key: OWNER_UNION_ID      # optional: union id that becomes admin
         sync: false
+      # ── Standalone login (self-hosted) ──
+      # Set BOTH to enable a username/password admin login on /login.
+      # Needed because Kimi OAuth only trusts Kimi-hosted callback domains.
+      - key: ADMIN_USERNAME      # e.g. fbv-admin
+        sync: false
+      - key: ADMIN_PASSWORD      # choose a strong password
+        sync: false
