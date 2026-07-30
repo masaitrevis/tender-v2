@@ -10,12 +10,13 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   SlidersHorizontal, Hash, Bell, Database, Palette, Lock, Download, Upload,
-  RotateCcw, FileX2, Check, AlertTriangle, ShieldCheck,
+  RotateCcw, FileX2, Check, AlertTriangle, ShieldCheck, Trash2,
 } from 'lucide-react';
 import {
   useStore, updateSettings, resetToSeed, exportJSON, importJSON, storageUsage,
-  mutateStore, nextDocNumber, TODAY, type AppState,
+  mutateStore, nextDocNumber, refreshFromServer, TODAY, type AppState,
 } from '@/lib/store';
+import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { PageHeader, SelectInput, Toggle, ConfirmDialog, ExpiryBadge, Modal } from '@/components/shared';
 import { cn } from '@/lib/utils';
@@ -584,8 +585,25 @@ function DataTab({ state }: { state: AppState }) {
   const [importError, setImportError] = useState('');
   const [resetStep, setResetStep] = useState(0); // 0 = idle, 1 = first confirm, 2 = hold-to-confirm
   const [clearOpen, setClearOpen] = useState(false);
+  const [wipeStep, setWipeStep] = useState(0); // 0 = idle, 1 = first confirm, 2 = type-DELETE confirm
+  const [wipeIncludeProfile, setWipeIncludeProfile] = useState(false);
+  const [wiping, setWiping] = useState(false);
+  const [wipeError, setWipeError] = useState('');
   const [done, setDone] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const confirmWipe = async () => {
+    setWiping(true);
+    setWipeError('');
+    try {
+      await api.data.clearAll.mutate({ includeProfile: wipeIncludeProfile });
+      await refreshFromServer();
+      window.location.reload();
+    } catch (err) {
+      setWipeError(err instanceof Error ? err.message : 'Clear failed. Please try again.');
+      setWiping(false);
+    }
+  };
 
   /* storage segments (bytes of each JSON slice) */
   const segments = useMemo(() => {
@@ -714,6 +732,37 @@ function DataTab({ state }: { state: AppState }) {
         )}
       </Card>
 
+      {/* Danger zone */}
+      <Card title="Danger Zone">
+        <div className="rounded-lg border border-danger/30 bg-danger-soft/40 p-4">
+          <Row label="Clear all data" hint="Permanently deletes every record in every module — clients, suppliers, products, employees, tenders, documents, payments, deadlines, bonds, milestones, risks, approvals, CRM, audit trail, DMS files and document numbering. Export a backup first.">
+            <button onClick={() => setWipeStep(1)} className="flex h-9 items-center gap-2 rounded-lg bg-danger px-4 text-[13px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[.98]">
+              <Trash2 size={15} /> Clear all data
+            </button>
+          </Row>
+        </div>
+      </Card>
+
+      {/* Wipe: first confirm, then type-DELETE confirm */}
+      <ConfirmDialog
+        open={wipeStep === 1}
+        onClose={() => setWipeStep(0)}
+        onConfirm={() => setWipeStep(2)}
+        title="Clear ALL data?"
+        message="Every record in the system will be permanently deleted (your company profile and settings are kept unless you choose otherwise in the next step). This cannot be undone — export a backup first if you are unsure."
+        confirmLabel="Yes, continue"
+        destructive
+      />
+      <TypeToWipe
+        open={wipeStep === 2}
+        onClose={() => { setWipeStep(0); setWipeError(''); }}
+        includeProfile={wipeIncludeProfile}
+        onIncludeProfileChange={setWipeIncludeProfile}
+        onConfirm={confirmWipe}
+        busy={wiping}
+        error={wipeError}
+      />
+
       {/* Import confirm */}
       <ConfirmDialog
         open={importOpen}
@@ -832,6 +881,78 @@ function HoldToReset({ open, onClose }: { open: boolean; onClose: () => void }) 
           />
         </svg>
         Hold to reset all data
+      </button>
+    </Modal>
+  );
+}
+
+/** Final wipe step — requires typing DELETE, optional profile/settings erase. */
+function TypeToWipe({
+  open, onClose, includeProfile, onIncludeProfileChange, onConfirm, busy, error,
+}: {
+  open: boolean;
+  onClose: () => void;
+  includeProfile: boolean;
+  onIncludeProfileChange: (v: boolean) => void;
+  onConfirm: () => void;
+  busy: boolean;
+  error: string;
+}) {
+  const [typed, setTyped] = useState('');
+  useEffect(() => {
+    if (!open) setTyped('');
+  }, [open]);
+  const ready = typed.trim().toUpperCase() === 'DELETE';
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      width="max-w-[440px]"
+      title={
+        <span className="flex items-center gap-2">
+          <AlertTriangle size={16} className="text-danger" /> Final confirmation
+        </span>
+      }
+    >
+      <p className="text-sm leading-6 text-app-slate">
+        This permanently deletes <strong>all records in every module</strong>. A single audit-trail
+        entry documenting the wipe is kept, and the demo dataset will <strong>not</strong> be restored.
+      </p>
+      <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-lg border border-app-border p-3 text-[13px] text-app-ink">
+        <input
+          type="checkbox"
+          checked={includeProfile}
+          onChange={(e) => onIncludeProfileChange(e.target.checked)}
+          className="mt-0.5 h-4 w-4 accent-danger"
+        />
+        <span>
+          <span className="font-semibold">Also erase company profile &amp; settings</span>
+          <span className="block text-xs text-app-muted">
+            Letterhead details, tax numbers, bank accounts and app preferences. Leave unchecked to keep them.
+          </span>
+        </span>
+      </label>
+      <div className="mt-4">
+        <label className="mb-1.5 block text-xs font-semibold text-app-slate">
+          Type <span className="font-mono font-bold text-danger">DELETE</span> to confirm
+        </label>
+        <input
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          placeholder="DELETE"
+          autoFocus
+          className="h-10 w-full rounded-lg border border-app-border px-3 font-mono text-sm outline-none focus:border-danger focus:ring-2 focus:ring-danger/20"
+        />
+      </div>
+      {error && <p className="mt-3 text-xs font-medium text-danger">{error}</p>}
+      <button
+        onClick={onConfirm}
+        disabled={!ready || busy}
+        className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-danger text-sm font-bold text-white transition enabled:hover:-translate-y-px enabled:active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <Trash2 size={16} />
+        {busy ? 'Clearing…' : 'Permanently clear all data'}
       </button>
     </Modal>
   );

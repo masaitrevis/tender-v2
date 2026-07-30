@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { createRouter, authedQuery } from "./middleware";
+import { createRouter, authedQuery, adminQuery } from "./middleware";
 import {
   bulkUpsertEntities,
+  clearAllData,
   entityCount,
   exportAll,
   getAllEntities,
@@ -131,4 +132,17 @@ export const dataRouter = createRouter({
     entityCount: await entityCount(),
     sequences: await peekSequences(),
   })),
+
+  /**
+   * Admin-only: wipe ALL app data (every collection + doc numbering),
+   * optionally including company profile & settings. Leaves a single
+   * audit-trail marker so first-run demo seeding never re-triggers.
+   */
+  clearAll: adminQuery
+    .input(z.object({ includeProfile: z.boolean().default(false) }))
+    .mutation(async ({ input, ctx }) => {
+      const actor =
+        ctx.user.name ?? ctx.user.username ?? ctx.user.unionId ?? "admin";
+      return clearAllData({ includeProfile: input.includeProfile, actor });
+    }),
 });

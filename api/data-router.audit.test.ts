@@ -276,6 +276,87 @@ describe("6. export/import round-trip", () => {
   }, 180_000);
 });
 
+describe("10. clearAll (admin-only full wipe)", () => {
+  const nonAdmin = appRouter.createCaller({
+    req: new Request("http://audit.local"),
+    resHeaders: new Headers(),
+    user: { ...adminUser, role: "user" } as unknown as User,
+  });
+
+  it("rejects anonymous and non-admin callers", async () => {
+    await expectUnauthorized(anon.data.clearAll({ includeProfile: false }));
+    await expect(
+      nonAdmin.data.clearAll({ includeProfile: false }),
+    ).rejects.toSatisfy(
+      (e) =>
+        (e as { data?: { code?: string } }).data?.code === "FORBIDDEN" ||
+        (e as { code?: string }).code === "FORBIDDEN" ||
+        String(e).includes("FORBIDDEN"),
+    );
+  });
+
+  it("wipes every collection + sequences, keeps profile/settings, blocks re-seed", async () => {
+    await authed.data.bulkUpsert({
+      collection: "clients",
+      items: [{ id: "audit-clr-1" }, { id: "audit-clr-2" }],
+    });
+    await authed.data.bulkUpsert({
+      collection: "tenders",
+      items: [{ id: "audit-clr-3" }],
+    });
+    await authed.data.nextDocNumber({ prefix: AUDIT_PREFIX, year: 2026 });
+    await authed.data.updateProfile({ profile: { companyName: "Audit Co" } });
+    await authed.data.updateSettings({ settings: { theme: "dark" } });
+
+    const res = await authed.data.clearAll({ includeProfile: false });
+    expect(res.deleted).toBeGreaterThanOrEqual(3);
+
+    const stats = await authed.data.stats();
+    expect(stats.entityCount).toBe(1); // only the audit marker survives
+    expect(stats.sequences).toEqual({});
+
+    for (const collection of COLLECTIONS) {
+      const list = await authed.data.list({ collection });
+      if (collection === "audit") {
+        expect(list).toHaveLength(1);
+        const marker = list[0] as {
+          action: string; entityRef: string; user: string; details: string;
+        };
+        expect(marker.action).toBe("Cleared");
+        expect(marker.entityRef).toBe("ALL");
+        expect(marker.user).toBe("Audit Bot");
+        expect(marker.details).toContain("cleared by administrator");
+      } else {
+        expect(list).toHaveLength(0);
+      }
+    }
+
+    const state = await authed.data.getState();
+    expect(state.profile).toEqual({ companyName: "Audit Co" });
+    expect(state.settings).toEqual({ theme: "dark" });
+
+    // Entities table is non-empty (marker) → demo seeding stays blocked.
+    const seeded = await authed.data.seedIfEmpty({
+      dump: { entities: { clients: [{ id: "audit-nope" }] } },
+    });
+    expect(seeded.seeded).toBe(false);
+    expect(await authed.data.list({ collection: "clients" })).toHaveLength(0);
+  });
+
+  it("includeProfile=true also clears the kv singletons", async () => {
+    await authed.data.updateProfile({ profile: { companyName: "Audit Co" } });
+    await authed.data.bulkUpsert({
+      collection: "clients",
+      items: [{ id: "audit-clr-9" }],
+    });
+    await authed.data.clearAll({ includeProfile: true });
+    const state = await authed.data.getState();
+    expect(state.profile).toBeNull();
+    expect(state.settings).toBeNull();
+    expect((await authed.data.stats()).entityCount).toBe(1);
+  });
+});
+
 afterAll(async () => {
   // ---- MANDATORY CLEANUP ----
   // Remove all audit-* leftovers defensively, then wipe app data.

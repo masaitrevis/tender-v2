@@ -200,3 +200,48 @@ export async function seedIfEmpty(dump: {
   await importAll(dump);
   return true;
 }
+
+/**
+ * Admin-only full data wipe. Deletes every entity and every document-number
+ * sequence; optionally also clears the profile/settings kv singletons.
+ *
+ * Afterwards exactly ONE audit-trail marker row is inserted. That row (a)
+ * documents the wipe and (b) keeps the entities table non-empty so the
+ * frontend's first-run demo seeding (seedIfEmpty) never re-triggers.
+ */
+export async function clearAllData(opts: {
+  includeProfile: boolean;
+  actor: string;
+}): Promise<{ deleted: number }> {
+  return await getDb().transaction(async (tx) => {
+    const existing = await tx
+      .select({ n: sql<number>`count(*)` })
+      .from(schema.entities);
+    const deleted = Number(existing.at(0)?.n ?? 0);
+
+    await tx.delete(schema.entities);
+    await tx.delete(schema.docSequences);
+    if (opts.includeProfile) {
+      await tx.delete(schema.kvStore);
+    }
+
+    const markerId = `aud-clear-${Date.now().toString(36)}`;
+    await tx.insert(schema.entities).values({
+      collection: "audit",
+      id: markerId,
+      data: {
+        id: markerId,
+        timestamp: new Date().toISOString(),
+        user: opts.actor,
+        action: "Cleared",
+        entity: "System Data",
+        entityRef: "ALL",
+        details: opts.includeProfile
+          ? "All system data, company profile and settings cleared by administrator"
+          : "All system data cleared by administrator (company profile & settings kept)",
+      },
+    });
+
+    return { deleted };
+  });
+}
