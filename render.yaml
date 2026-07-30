@@ -10,7 +10,7 @@ services:
     runtime: node
     plan: starter
     branch: master
-    buildCommand: npm install && npm run build
+    buildCommand: npm install -g npm@10.9.2 && npm ci --no-audit --no-fund && npm run build
     startCommand: npm start
     healthCheckPath: /
     envVars:
