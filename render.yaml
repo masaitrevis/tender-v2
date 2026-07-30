@@ -10,14 +10,12 @@ services:
     runtime: node
     plan: starter
     branch: master
-    buildCommand: corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile && pnpm run build
+    buildCommand: corepack enable && corepack prepare pnpm@9.15.4 --activate && NODE_ENV=development pnpm install --frozen-lockfile && pnpm run build
     startCommand: npm start
     healthCheckPath: /
     envVars:
       - key: NODE_VERSION
         value: "20"
-      - key: NODE_ENV
-        value: production
       # ── Secrets: Render prompts for these in the dashboard (sync: false) ──
       - key: DATABASE_URL      # mysql://user:pass@host:4000/fbv?ssl={...}
         sync: false
