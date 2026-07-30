@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 214 32% 96%;
+    --foreground: 208 39% 17%;
+    --card: 0 0% 100%;
+    --card-foreground: 208 39% 17%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 208 39% 17%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 214 32% 96%;
+    --secondary-foreground: 208 39% 17%;
+    --muted: 214 32% 96%;
+    --muted-foreground: 212 13% 52%;
+    --accent: 214 32% 96%;
+    --accent-foreground: 208 39% 17%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 216 24% 92%;
+    --input: 216 24% 92%;
+    --ring: 221 83% 53%;
+    --radius: 0.625rem;
+    --sidebar-background: 207 58% 14%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 221 83% 53%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 207 40% 22%;
+    --sidebar-ring: 221 83% 53%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-app-bg text-app-ink font-sans antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04';
+  }
+  h1, h2, h3, h4 {
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: rgba(37, 99, 235, 0.18);
+  }
+  /* slim scrollbars for the app shell */
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #c6cfda;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  .skeleton-shimmer {
+    background: linear-gradient(90deg, #edf1f6 25%, #f8fafc 50%, #edf1f6 75%);
+    background-size: 800px 100%;
+    animation: shimmer 1.2s linear infinite;
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-page {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+}

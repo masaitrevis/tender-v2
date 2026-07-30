@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360" fill="none">
+  <ellipse cx="240" cy="312" rx="150" ry="14" fill="#1F3B57" fill-opacity="0.05"/>
+  <!-- folder -->
+  <g stroke="#2A4A6B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M96 128 h84 l20 -22 h56 a10 10 0 0 1 10 10 v12" fill="#FFFFFF"/>
+    <path d="M96 128 L82 260 a12 12 0 0 0 12 14 h212 a12 12 0 0 0 12 -12 V128 Z" fill="#FFFFFF"/>
+    <path d="M96 128 L82 260 a12 12 0 0 0 12 14 h212 a12 12 0 0 0 12 -12 V128" fill="#EEF1F5" fill-opacity="0.6"/>
+  </g>
+  <!-- certificate inside folder -->
+  <g stroke="#8494A7" stroke-width="3" stroke-linecap="round">
+    <rect x="132" y="150" width="150" height="104" rx="8" fill="#FFFFFF"/>
+    <path d="M150 176 h114 M150 194 h114 M150 212 h74"/>
+  </g>
+  <!-- gold seal on certificate -->
+  <circle cx="248" cy="222" r="16" fill="#C9A227" fill-opacity="0.25" stroke="#C9A227" stroke-width="3"/>
+  <path d="M240 222 l6 6 10 -12" stroke="#C9A227" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M244 238 l-5 16 9 -7 9 7 -5 -16" fill="#C9A227" fill-opacity="0.5"/>
+  <!-- rosette -->
+  <g stroke="#2A4A6B" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="338" cy="158" r="22" fill="#FFFFFF"/>
+    <circle cx="338" cy="158" r="12" fill="#C9A227" fill-opacity="0.35" stroke="#C9A227"/>
+    <path d="M330 178 l-8 26 16 -11 16 11 -8 -26" fill="#FFFFFF"/>
+  </g>
+  <!-- shield-check -->
+  <g stroke="#2A4A6B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M358 224 l34 -12 v26 c0 26 -16 40 -34 48 c-18 -8 -34 -22 -34 -48 v-26 z" fill="#FFFFFF"/>
+    <path d="M344 244 l10 11 20 -23" stroke="#16A34A"/>
+  </g>
+  <!-- sparkles -->
+  <g stroke="#C9A227" stroke-width="3" stroke-linecap="round">
+    <path d="M118 84 v14 M111 91 h14"/>
+    <path d="M384 88 v12 M378 94 h12"/>
+  </g>
+</svg>
